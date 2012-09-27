@@ -45,24 +45,7 @@
 #define LOWMEM_DEATHPENDING_DEPTH 3
 #endif
 
-#ifdef LMK_COUNT_READ
-static uint32_t lmk_count = 0;
-#endif
-
-#ifdef CONFIG_SEC_OOM_KILLER
-#define MULTIPLE_OOM_KILLER
-#define OOM_COUNT_READ
-#endif
-
-#ifdef OOM_COUNT_READ
-static uint32_t oom_count = 0;
-#endif
-
-#ifdef MULTIPLE_OOM_KILLER
-#define OOM_DEPTH 7
-#endif
-
-static uint32_t lowmem_debug_level = 2;
+static uint32_t lowmem_debug_level = 1;
 static int lowmem_adj[6] = {
 	0,
 	1,

@@ -54,36 +54,39 @@ int lzo1x_decompress_safe(const unsigned char *in, size_t in_len,
 
 	while ((ip < ip_end)) {
 		t = *ip++;
-		if (t >= 16)
-			goto match;
-		if (t == 0) {
-			if (HAVE_IP(1, ip_end, ip))
-				goto input_overrun;
-			while (*ip == 0) {
-				t += 255;
-				ip++;
-				if (HAVE_IP(1, ip_end, ip))
-					goto input_overrun;
-			}
-			t += 15 + *ip++;
-		}
-		if (HAVE_OP(t + 3, op_end, op))
-			goto output_overrun;
-		if (HAVE_IP(t + 4, ip_end, ip))
-			goto input_overrun;
-
-		COPY4(op, ip);
-		op += 4;
-		ip += 4;
-		if (--t > 0) {
-			if (t >= 4) {
-				do {
-					COPY4(op, ip);
-					op += 4;
-					ip += 4;
-					t -= 4;
-				} while (t >= 4);
-				if (t > 0) {
+		if (t < 16) {
+			if (likely(state == 0)) {
+				if (unlikely(t == 0)) {
+					while (unlikely(*ip == 0)) {
+						t += 255;
+						ip++;
+						NEED_IP(1);
+					}
+					t += 15 + *ip++;
+				}
+				t += 3;
+copy_literal_run:
+#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+				if (likely(HAVE_IP(t + 15) && HAVE_OP(t + 15))) {
+					const unsigned char *ie = ip + t;
+					unsigned char *oe = op + t;
+					do {
+						COPY8(op, ip);
+						op += 8;
+						ip += 8;
+#  if !defined(__arm__)
+						COPY8(op, ip);
+						op += 8;
+						ip += 8;
+#  endif
+					} while (ip < ie);
+					ip = ie;
+					op = oe;
+				} else
+#endif
+				{
+					NEED_OP(t);
+					NEED_IP(t + 3);
 					do {
 						*op++ = *ip++;
 					} while (--t > 0);
@@ -189,15 +192,23 @@ match:
 				m_pos += 4;
 				t -= 4 - (3 - 1);
 				do {
-					COPY4(op, m_pos);
-					op += 4;
-					m_pos += 4;
-					t -= 4;
-				} while (t >= 4);
-				if (t > 0)
-					do {
-						*op++ = *m_pos++;
-					} while (--t > 0);
+					COPY8(op, m_pos);
+					op += 8;
+					m_pos += 8;
+#  if !defined(__arm__)
+					COPY8(op, m_pos);
+					op += 8;
+					m_pos += 8;
+#  endif
+				} while (op < oe);
+				op = oe;
+				if (HAVE_IP(6)) {
+					state = next;
+					COPY4(op, ip);
+					op += next;
+					ip += next;
+					continue;
+				}
 			} else {
 copy_match:
 				*op++ = *m_pos++;

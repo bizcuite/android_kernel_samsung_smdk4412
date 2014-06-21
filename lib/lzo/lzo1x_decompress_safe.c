@@ -176,7 +176,6 @@ copy_literal_run:
 		if (op - m_pos >= 8) {
 			unsigned char *oe = op + t;
 			if (likely(HAVE_OP(t, 15))) {
->>>>>>> 912b213... lzo: properly check for overruns
 				do {
 					COPY8(op, m_pos);
 					op += 8;

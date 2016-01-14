@@ -1,7 +1,7 @@
 /*
  * Broadcom Dongle Host Driver (DHD), common DHD core.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_common.c 439205 2013-11-26 00:41:18Z $
+ * $Id: dhd_common.c 451346 2014-01-24 22:19:39Z $
  */
 #include <typedefs.h>
 #include <osl.h>
@@ -72,15 +72,12 @@
 #ifdef WLMEDIA_HTSF
 extern void htsf_update(struct dhd_info *dhd, void *data);
 #endif
+#ifdef DHD_DEBUG
 int dhd_msg_level = DHD_ERROR_VAL;
+#endif
 
 
 #include <wl_iw.h>
-
-#ifdef WRITE_WLANINFO
-char fw_path[MOD_PARAM_PATHLEN];
-char nv_path[MOD_PARAM_PATHLEN];
-#endif
 
 #ifdef SOFTAP
 char fw_path2[MOD_PARAM_PATHLEN];
@@ -364,7 +361,9 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 			wl_cfg80211_enable_trace(FALSE, WL_DBG_DBG);
 		if (!(int_val & DHD_WL_VAL2))
 #endif /* WL_CFG80211 */
+#ifdef DHD_DEBUG
 		dhd_msg_level = int_val;
+#endif
 		break;
 	case IOV_GVAL(IOV_BCMERRORSTR):
 		bcm_strncpy_s((char *)arg, len, bcmerrorstr(dhd_pub->bcmerror), BCME_STRLEN);
@@ -712,6 +711,7 @@ dhd_prec_drop_pkts(dhd_pub_t *dhdp, struct pktq *pq, int prec, f_droppkt_t fn)
 			if (first) {
 				/* No last frag pkt, use prev as last */
 				last = prev;
+				break;
 			} else {
 				first = p;
 				prev_first = prev;
@@ -761,6 +761,8 @@ dhd_prec_drop_pkts(dhd_pub_t *dhdp, struct pktq *pq, int prec, f_droppkt_t fn)
 			q->tail = NULL;
 	} else {
 		PKTSETLINK(prev_first, next);
+		if (!next)
+			q->tail = prev_first;
 	}
 
 	return TRUE;
@@ -2394,7 +2396,7 @@ wl_iw_parse_channel_list_tlv(char** list_str, uint16* channel_list,
  *  SSIDs list parsing from cscan tlv list
  */
 int
-wl_iw_parse_ssid_list_tlv(char** list_str, wlc_ssid_t* ssid, int max, int *bytes_left)
+wl_iw_parse_ssid_list_tlv(char** list_str, wlc_ssid_ext_t* ssid, int max, int *bytes_left)
 {
 	char* str;
 	int idx = 0;
@@ -2442,6 +2444,7 @@ wl_iw_parse_ssid_list_tlv(char** list_str, wlc_ssid_t* ssid, int max, int *bytes
 
 			*bytes_left -= ssid[idx].SSID_len;
 			str += ssid[idx].SSID_len;
+			ssid[idx].hidden = TRUE;
 
 			DHD_TRACE(("%s :size=%d left=%d\n",
 				(char*)ssid[idx].SSID, ssid[idx].SSID_len, *bytes_left));

@@ -1,7 +1,7 @@
 /*
  * Linux cfgp2p driver
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfgp2p.h 433630 2013-11-01 19:15:47Z $
+ * $Id: wl_cfgp2p.h 444054 2013-12-18 11:33:42Z $
  */
 #ifndef _wl_cfgp2p_h_
 #define _wl_cfgp2p_h_
@@ -29,7 +29,11 @@
 #include <proto/p2p.h>
 
 struct bcm_cfg80211;
+#ifdef DEBUGFS_CFG80211
 extern u32 wl_dbg_level;
+#else
+#define wl_dbg_level (0)
+#endif
 
 typedef struct wifi_p2p_ie wifi_wfd_ie_t;
 /* Enumeration of the usages of the BSSCFGs used by the P2P Library.  Do not
@@ -74,7 +78,7 @@ struct p2p_saved_ie {
 };
 
 struct p2p_bss {
-	u32 bssidx;
+	s32 bssidx;
 	struct net_device *dev;
 	struct p2p_saved_ie saved_ie;
 	void *private_data;
@@ -203,6 +207,12 @@ enum wl_cfgp2p_status {
 #endif
 #endif /* (LINUX_VERSION >= VERSION(3, 8, 0)) */
 
+#ifndef WL_CFG80211_P2P_DEV_IF
+#ifdef WL_NEWCFG_PRIVCMD_SUPPORT
+#undef WL_NEWCFG_PRIVCMD_SUPPORT
+#endif
+#endif /* WL_CFG80211_P2P_DEV_IF */
+
 #if defined(WL_ENABLE_P2P_IF) && (defined(WL_CFG80211_P2P_DEV_IF) || \
 	(LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)))
 #error Disable 'WL_ENABLE_P2P_IF', if 'WL_CFG80211_P2P_DEV_IF' is enabled \
@@ -233,8 +243,8 @@ wl_cfgp2p_find_gas_subtype(u8 subtype, u8* data, u32 len);
 extern bool
 wl_cfgp2p_is_p2p_gas_action(void *frame, u32 frame_len);
 #endif /* CUSTOMER_HW4 */
-extern void
-wl_cfgp2p_print_actframe(bool tx, void *frame, u32 frame_len, u32 channel);
+static inline void wl_cfgp2p_print_actframe(bool tx, void *frame,
+	u32 frame_len, u32 channel) { }
 extern s32
 wl_cfgp2p_init_priv(struct bcm_cfg80211 *cfg);
 extern void

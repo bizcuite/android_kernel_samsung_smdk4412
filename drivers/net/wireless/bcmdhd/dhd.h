@@ -4,7 +4,7 @@
  * Provides type definitions and function prototypes used to link the
  * DHD OS, bus, and protocol modules.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd.h 439237 2013-11-26 02:17:05Z $
+ * $Id: dhd.h 457596 2014-02-24 02:24:14Z $
  */
 
 /****************
@@ -52,6 +52,7 @@
 struct task_struct;
 struct sched_param;
 int setScheduler(struct task_struct *p, int policy, struct sched_param *param);
+int get_scheduler_policy(struct task_struct *p);
 
 #define ALL_INTERFACES	0xff
 
@@ -102,8 +103,9 @@ enum dhd_op_flags {
 #define MAX_CNTL_RX_TIMEOUT 1
 #endif /* MAX_CNTL_RX_TIMEOUT */
 
-#define DHD_SCAN_ASSOC_ACTIVE_TIME	40 /* ms: Embedded default Active setting from DHD */
-#define DHD_SCAN_UNASSOC_ACTIVE_TIME 80 /* ms: Embedded def. Unassoc Active setting from DHD */
+#define DHD_SCAN_ASSOC_ACTIVE_TIME	20 /* ms: Embedded default Active setting from DHD */
+#define DHD_SCAN_UNASSOC_ACTIVE_TIME	40 /* ms: Embedded def. Unassoc Active setting from DHD */
+#define DHD_SCAN_UNASSOC_ACTIVE_TIME_PS	30
 #define DHD_SCAN_PASSIVE_TIME		130 /* ms: Embedded default Passive setting from DHD */
 
 #ifndef POWERUP_MAX_RETRY
@@ -275,6 +277,7 @@ typedef struct dhd_pub {
 	0 - Do not do any proptxtstatus flow control
 	1 - Use implied credit from a packet status
 	2 - Use explicit credit
+	3 - Only AMPDU hostreorder used. no wlfc.
 	*/
 	uint8	proptxstatus_mode;
 	bool	proptxstatus_txoff;
@@ -328,6 +331,12 @@ typedef struct dhd_pub {
 #if defined(CUSTOMER_HW4)
 	bool dhd_bug_on;
 #endif
+#ifdef CUSTOM_SET_CPUCORE
+	struct task_struct * current_dpc;
+	struct task_struct * current_rxf;
+	int chan_isvht80;
+#endif /* CUSTOM_SET_CPUCORE */
+	int  short_dwell_time;
 } dhd_pub_t;
 #if defined(CUSTOMER_HW4)
 #define MAX_RESCHED_CNT 600
@@ -404,14 +413,86 @@ int dhd_pno_clean(dhd_pub_t *dhd);
  *  Wake locks are an Android power management concept. They are used by applications and services
  *  to request CPU resources.
  */
-extern int dhd_os_wake_lock(dhd_pub_t *pub);
-extern int dhd_os_wake_unlock(dhd_pub_t *pub);
-extern int dhd_os_wake_lock_timeout(dhd_pub_t *pub);
-extern int dhd_os_wake_lock_rx_timeout_enable(dhd_pub_t *pub, int val);
-extern int dhd_os_wake_lock_ctrl_timeout_enable(dhd_pub_t *pub, int val);
-extern int dhd_os_wake_lock_ctrl_timeout_cancel(dhd_pub_t *pub);
-extern int dhd_os_wd_wake_lock(dhd_pub_t *pub);
-extern int dhd_os_wd_wake_unlock(dhd_pub_t *pub);
+#ifdef CONFIG_HAS_WAKELOCK
+struct dhd_info;
+#define dhd_info_t struct dhd_info
+
+enum {
+	DHD_WL_rx = 0,
+	DHD_WL_ctrl,
+};
+
+#define dhd_wake_func(fn) \
+	extern int dhd_int_wake_##fn (dhd_info_t *dhd); \
+	static inline int dhd_os_wake_##fn (dhd_pub_t *pub) \
+	{ return dhd_int_wake_##fn ((dhd_info_t *)pub->info); }
+
+extern int dhd_int_wake_timeout_enable(dhd_info_t *dhd, int val, int wl);
+extern int dhd_int_wake_timeout_cancel(dhd_info_t *dhd, int wl);
+#define dhd_tmout_func(fn) \
+	static inline int dhd_os_wake_lock_##fn##_timeout_enable \
+		(dhd_pub_t *pub, int val) \
+	{ return dhd_int_wake_timeout_enable((dhd_info_t *)pub->info, val, \
+		DHD_WL_##fn ); } \
+	static inline int dhd_os_wake_lock_##fn##_timeout_cancel \
+		(dhd_pub_t *pub) \
+	{ return dhd_int_wake_timeout_cancel((dhd_info_t *)pub->info, \
+		DHD_WL_##fn ); }
+
+#define net_wake_func(fn) \
+	static inline int net_os_wake_##fn (struct net_device *dev) \
+	{ \
+		dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev); \
+		return dhd?dhd_int_wake_##fn (dhd):0; \
+	}
+
+#define net_tmout_func(fn) \
+	static inline int net_os_wake_lock_##fn##_timeout_enable \
+		(struct net_device *dev, int val) \
+	{ \
+		dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev); \
+		return dhd ? dhd_int_wake_timeout_enable(dhd, val, \
+			DHD_WL_##fn ) : 0; \
+	} \
+	static inline int net_os_wake_lock_##fn##_timeout_cancel \
+		(struct net_device *dev) \
+	{ \
+		dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev); \
+		return dhd ? dhd_int_wake_timeout_cancel(dhd, \
+			DHD_WL_##fn ) : 0; \
+	} \
+
+/* Core wake functions */
+dhd_wake_func(lock);
+dhd_wake_func(unlock);
+dhd_wake_func(lock_timeout);
+dhd_tmout_func(rx);
+dhd_tmout_func(ctrl);
+
+/* struct net_device wrappers */
+net_wake_func(lock);
+net_wake_func(unlock);
+net_wake_func(lock_timeout);
+net_tmout_func(rx);
+net_tmout_func(ctrl);
+
+#define DHD_WD_LOCK  (1)
+#define DHD_WD_WAIVE (2)
+extern int dhd_int_wd_wake_lock(dhd_info_t *dhd);
+extern int dhd_int_wd_wake_unlock(dhd_info_t *dhd);
+static inline int dhd_os_wd_wake_lock(dhd_pub_t *pub)
+{ return (pub && pub->info) ? dhd_int_wd_wake_lock(pub->info) : 0; }
+static inline int dhd_os_wd_wake_unlock(dhd_pub_t *pub)
+{ return (pub && pub->info) ? dhd_int_wd_wake_unlock(pub->info) : 0; }
+
+#undef dhd_wake_func
+#undef dhd_tmount_func
+#undef net_wake_func
+#undef net_tmout_func
+#undef dhd_info_t
+#else
+#error CONFIG_HAS_WAKELOCK is required
+#endif
 
 inline static void MUTEX_LOCK_SOFTAP_SET_INIT(dhd_pub_t * dhdp)
 {
@@ -484,7 +565,7 @@ inline static void MUTEX_UNLOCK_SOFTAP_SET(dhd_pub_t * dhdp)
 #define DHD_OS_WAKE_LOCK_CTRL_TIMEOUT_CANCEL(pub) \
 	dhd_os_wake_lock_ctrl_timeout_cancel(pub)
 #endif /* DHD_DEBUG_WAKE_LOCK */
-#define DHD_PACKET_TIMEOUT_MS	1000
+#define DHD_PACKET_TIMEOUT_MS	500
 #define DHD_EVENT_TIMEOUT_MS	1500
 
 
@@ -598,6 +679,14 @@ extern void dhd_set_version_info(dhd_pub_t *pub, char *fw);
 extern bool dhd_os_check_if_up(dhd_pub_t *pub);
 extern int dhd_os_check_wakelock(dhd_pub_t *pub);
 
+#ifdef CUSTOM_SET_CPUCORE
+extern void dhd_set_cpucore(dhd_pub_t *dhd, int set);
+#endif /* CUSTOM_SET_CPUCORE */
+extern void dhd_set_short_dwell_time(dhd_pub_t *dhd, int set);
+#ifdef CUSTOM_SET_SHORT_DWELL_TIME
+extern void net_set_short_dwell_time(struct net_device *dev, int set);
+#endif
+
 #if defined(KEEP_ALIVE)
 extern int dhd_keep_alive_onoff(dhd_pub_t *dhd);
 #endif /* KEEP_ALIVE */
@@ -669,6 +758,9 @@ extern int dhd_sendpkt(dhd_pub_t *dhdp, int ifidx, void *pkt);
 extern void dhd_sendup_event_common(dhd_pub_t *dhdp, wl_event_msg_t *event, void *data);
 /* Send event to host */
 extern void dhd_sendup_event(dhd_pub_t *dhdp, wl_event_msg_t *event, void *data);
+#ifdef LOG_INTO_TCPDUMP
+extern void dhd_sendup_log(dhd_pub_t *dhdp, void *data, int len);
+#endif /* LOG_INTO_TCPDUMP */
 extern int dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag);
 extern uint dhd_bus_status(dhd_pub_t *dhdp);
 extern int  dhd_bus_start(dhd_pub_t *dhdp);
@@ -796,7 +888,7 @@ extern uint dhd_force_tx_queueing;
 #define CUSTOM_LISTEN_INTERVAL 		LISTEN_INTERVAL
 #endif /* CUSTOM_LISTEN_INTERVAL */
 
-#define DEFAULT_SUSPEND_BCN_LI_DTIM		3
+#define DEFAULT_SUSPEND_BCN_LI_DTIM		5
 #ifndef CUSTOM_SUSPEND_BCN_LI_DTIM
 #define CUSTOM_SUSPEND_BCN_LI_DTIM		DEFAULT_SUSPEND_BCN_LI_DTIM
 #endif
@@ -809,6 +901,11 @@ extern uint dhd_force_tx_queueing;
 #ifndef WIFI_TURNOFF_DELAY
 #define WIFI_TURNOFF_DELAY		DEFAULT_WIFI_TURNOFF_DELAY
 #endif /* WIFI_TURNOFF_DELAY */
+
+#define DEFAULT_WIFI_TURNON_DELAY		200
+#ifndef WIFI_TURNON_DELAY
+#define WIFI_TURNON_DELAY		DEFAULT_WIFI_TURNON_DELAY
+#endif /* WIFI_TURNON_DELAY */
 
 #ifdef WLTDLS
 #ifndef CUSTOM_TDLS_IDLE_MODE_SETTING
@@ -825,7 +922,7 @@ extern uint dhd_force_tx_queueing;
 
 #define MAX_DTIM_SKIP_BEACON_INTERVAL	100 /* max allowed associated AP beacon for DTIM skip */
 #ifndef MAX_DTIM_ALLOWED_INTERVAL
-#define MAX_DTIM_ALLOWED_INTERVAL 600 /* max allowed total beacon interval for DTIM skip */
+#define MAX_DTIM_ALLOWED_INTERVAL 900 /* max allowed total beacon interval for DTIM skip */
 #endif
 #define NO_DTIM_SKIP 1
 #ifdef SDTEST
@@ -840,12 +937,6 @@ extern uint dhd_pktgen_len;
 
 /* optionally set by a module_param_string() */
 #define MOD_PARAM_PATHLEN	2048
-
-#ifdef WRITE_WLANINFO
-extern char fw_path[MOD_PARAM_PATHLEN];
-extern char nv_path[MOD_PARAM_PATHLEN];
-#endif
-
 #define MOD_PARAM_INFOLEN	512
 
 #ifdef SOFTAP
@@ -896,7 +987,7 @@ int dhd_ndo_enable(dhd_pub_t * dhd, int ndo_enable);
 int dhd_ndo_add_ip(dhd_pub_t *dhd, char* ipaddr, int idx);
 int dhd_ndo_remove_ip(dhd_pub_t *dhd, int idx);
 /* ioctl processing for nl80211 */
-int dhd_ioctl_process(dhd_pub_t *pub, int ifidx, struct dhd_ioctl *ioc);
+int dhd_ioctl_process(dhd_pub_t *pub, int ifidx, struct dhd_ioctl *ioc, void *data_buf);
 
 #if defined(SUPPORT_MULTIPLE_REVISION)
 extern int
@@ -905,6 +996,7 @@ concate_revision(struct dhd_bus *bus, char *fwpath, int fw_path_len, char *nvpat
 extern int wifi_get_fw_nv_path(char *fw, char *nv);
 #endif
 #endif /* SUPPORT_MULTIPLE_REVISION */
+void dhd_bus_update_fw_nv_path(struct dhd_bus *bus, char *pfw_path, char *pnv_path);
 void dhd_set_bus_state(void *bus, uint32 state);
 
 /* Remove proper pkts(either one no-frag pkt or whole fragmented pkts) */

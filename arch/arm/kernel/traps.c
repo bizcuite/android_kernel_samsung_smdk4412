@@ -55,7 +55,7 @@ static void dump_mem(const char *, const char *, unsigned long, unsigned long);
 void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame)
 {
 #ifdef CONFIG_KALLSYMS
-	printk("[<%08lx>] (%pS) from [<%08lx>] (%pS)\n", where, (void *)where, from, (void *)from);
+	printk("[<%08lx>] (%ps) from [<%08lx>] (%pS)\n", where, (void *)where, from, (void *)from);
 #else
 	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
 #endif
@@ -379,6 +379,19 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 
 	if (call_undef_hook(regs, instr) == 0)
 		return;
+
+	/* STARGO: hack for DIV emulation */
+	if ((processor_mode(regs) != SVC_MODE) && thumb_mode(regs)) {
+		if ((instr & 0x0310) == 0x0310) { /* Retry for division */
+			unsigned int instr2;
+			get_user(instr2, (u16 __user *)pc + 1);
+			instr <<= 16;
+			instr |= instr2;
+			if (call_undef_hook(regs, instr) == 0)
+				return;
+		}
+	}
+	/* END: STARGO: hack for DIV emulation */
 
 #ifdef CONFIG_DEBUG_USER
 	if (user_debug & UDBG_UNDEFINED) {

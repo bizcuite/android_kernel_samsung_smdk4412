@@ -1,7 +1,7 @@
 /*
  * Debug/trace/assert driver definitions for Dongle Host Driver.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -127,7 +127,11 @@
 #define DHD_BLOG(cp, size)
 
 #define DHD_NONE(args)
+#ifdef DHD_DEBUG
 extern int dhd_msg_level;
+#else
+#define dhd_msg_level (0)
+#endif
 
 /* Defines msg bits */
 #include <dhdioctl.h>

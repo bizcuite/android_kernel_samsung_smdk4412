@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
- * 
+ * Copyright (C) 2011-2012 ARM Limited. All rights reserved.
+ *
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
- * 
+ *
  * A copy of the licence is included with the program, and can also be obtained from Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
@@ -35,17 +35,6 @@
 #include "ump_ukk_wrappers.h"
 #include "ump_ukk_ref_wrappers.h"
 
-/* MALI_SEC */
-#ifdef CONFIG_ION_EXYNOS
-#include <linux/ion.h>
-extern struct ion_device *ion_exynos;
-struct ion_client *ion_client_ump = NULL;
-#endif
-
-/* MALI_SEC */
-#if defined(CONFIG_MALI400)
-extern int map_errcode( _mali_osk_errcode_t err );
-#endif
 
 /* Module parameter to control log level */
 int ump_debug_level = 2;
@@ -142,12 +131,6 @@ static int ump_initialize_module(void)
  */
 static void ump_cleanup_module(void)
 {
-/* MALI_SEC */
-#ifdef CONFIG_ION_EXYNOS
-	if (ion_client_ump)
-	    ion_client_destroy(ion_client_ump);
-#endif
-
 	DBG_MSG(2, ("Unloading UMP device driver\n"));
 	ump_kernel_destructor();
 	DBG_MSG(2, ("Module unloaded\n"));
@@ -356,18 +339,7 @@ static int ump_file_ioctl(struct inode *inode, struct file *filp, unsigned int c
 		case UMP_IOC_ALLOCATE :
 			err = ump_allocate_wrapper((u32 __user *)argument, session_data);
 			break;
-/* MALI_SEC */
-#ifdef CONFIG_ION_EXYNOS
-		case UMP_IOC_ION_IMPORT:
-			err = ump_ion_import_wrapper((u32 __user *)argument, session_data);
-			break;
-#endif
-#ifdef CONFIG_DMA_SHARED_BUFFER
-		case UMP_IOC_DMABUF_IMPORT:
-			err = ump_dmabuf_import_wrapper((u32 __user *)argument,
-							session_data);
-			break;
-#endif
+
 		case UMP_IOC_RELEASE:
 			err = ump_release_wrapper((u32 __user *)argument, session_data);
 			break;
@@ -405,25 +377,6 @@ static int ump_file_ioctl(struct inode *inode, struct file *filp, unsigned int c
 	return err;
 }
 
-/* MALI_SEC */
-#if !defined(CONFIG_MALI400)
-int map_errcode( _mali_osk_errcode_t err )
-{
-    switch(err)
-    {
-        case _MALI_OSK_ERR_OK : return 0;
-        case _MALI_OSK_ERR_FAULT: return -EFAULT;
-        case _MALI_OSK_ERR_INVALID_FUNC: return -ENOTTY;
-        case _MALI_OSK_ERR_INVALID_ARGS: return -EINVAL;
-        case _MALI_OSK_ERR_NOMEM: return -ENOMEM;
-        case _MALI_OSK_ERR_TIMEOUT: return -ETIMEDOUT;
-        case _MALI_OSK_ERR_RESTARTSYSCALL: return -ERESTARTSYS;
-        case _MALI_OSK_ERR_ITEM_NOT_FOUND: return -ENOENT;
-        default: return -EFAULT;
-    }
-}
-#endif
-
 /*
  * Handle from OS to map specified virtual memory to specified UMP memory.
  */
@@ -435,9 +388,7 @@ static int ump_file_mmap(struct file * filp, struct vm_area_struct * vma)
 
 	/* Validate the session data */
 	session_data = (struct ump_session_data *)filp->private_data;
-	/* MALI_SEC */
-	// original : if (NULL == session_data)
-	if (NULL == session_data || NULL == session_data->cookies_map->table->mappings)
+	if (NULL == session_data || NULL == session_data->cookies_map->table->mappings) /* MALI_SEC */
 	{
 		MSG_ERR(("mmap() called without any session data available\n"));
 		return -EFAULT;
@@ -482,10 +433,6 @@ EXPORT_SYMBOL(ump_dd_phys_blocks_get);
 EXPORT_SYMBOL(ump_dd_size_get);
 EXPORT_SYMBOL(ump_dd_reference_add);
 EXPORT_SYMBOL(ump_dd_reference_release);
-/* MALI_SEC */
-EXPORT_SYMBOL(ump_dd_meminfo_get);
-EXPORT_SYMBOL(ump_dd_meminfo_set);
-EXPORT_SYMBOL(ump_dd_handle_get_from_vaddr);
 
 /* Export our own extended kernel space allocator */
 EXPORT_SYMBOL(ump_dd_handle_create_from_phys_blocks);

@@ -15,11 +15,22 @@
 
 #ifndef __MALI_OSK_H__
 #define __MALI_OSK_H__
-
+#include "mali_osk_types.h"
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+
+	/* When DEBUG is enabled, this struct will be used to track owner, mode and order checking */
+#ifdef DEBUG
+	struct _mali_osk_lock_debug_s {
+		u32 owner;
+		_mali_osk_lock_flags_t orig_flags;
+		_mali_osk_lock_order_t order;
+		struct _mali_osk_lock_debug_s *next;
+	};
+#endif
+
 
 /**
  * @addtogroup uddapi Unified Device Driver (UDD) APIs

@@ -302,3 +302,40 @@ void _mali_osk_lock_term( _mali_osk_lock_t *lock )
     kfree(lock);
 }
 
+/*
+void _mali_osk_locks_debug_add(struct _mali_osk_lock_debug_s *checker)
+{
+	checker->owner = _mali_osk_get_tid();
+
+#ifdef LOCK_ORDER_CHECKING
+	if (!(checker->orig_flags & _MALI_OSK_LOCKFLAG_UNORDERED)) {
+		if (!add_lock_to_log_and_check(checker, _mali_osk_get_tid())) {
+			printk(KERN_ERR "%d: ERROR lock %p taken while holding a lock of a higher order.\n",
+			       _mali_osk_get_tid(), checker);
+			dump_stack();
+		}
+	}
+#endif
+}
+
+void _mali_osk_locks_debug_remove(struct _mali_osk_lock_debug_s *checker)
+{
+
+#ifdef LOCK_ORDER_CHECKING
+	if (!(checker->orig_flags & _MALI_OSK_LOCKFLAG_UNORDERED)) {
+		remove_lock_from_log(checker, _mali_osk_get_tid());
+	}
+#endif
+	checker->owner = 0;
+}
+
+void _mali_osk_locks_debug_init(struct _mali_osk_lock_debug_s *checker, _mali_osk_lock_flags_t flags, _mali_osk_lock_order_t order)
+{
+	checker->orig_flags = flags;
+	checker->owner = 0;
+
+#ifdef LOCK_ORDER_CHECKING
+	checker->order = order;
+	checker->next = NULL;
+#endif
+}*/

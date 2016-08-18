@@ -272,6 +272,7 @@ typedef struct {
 	u64 user_job_ptr;                   /**< [in] identifier for the job in user space, a @c mali_gp_job_info* */
 	u32 priority;                       /**< [in] job priority. A lower number means higher priority */
 	u32 frame_registers[MALIGP2_NUM_REGS_FRAME]; /**< [in] core specific registers associated with this job */
+	u32 heap_grow_size;     /** <[in] the grow size of the plbu heap when out of memory */
 	u32 perf_counter_flag;              /**< [in] bitmask indicating which performance counters to enable, see \ref _MALI_PERFORMANCE_COUNTER_FLAG_SRC0_ENABLE and related macro definitions */
 	u32 perf_counter_src0;              /**< [in] source id for performance counter 0 (see ARM DDI0415A, Table 3-60) */
 	u32 perf_counter_src1;              /**< [in] source id for performance counter 1 (see ARM DDI0415A, Table 3-60) */
@@ -302,6 +303,7 @@ typedef struct {
 typedef struct {
 	u64 user_job_ptr;                    /**< [out] identifier for the job in user space */
 	u32 cookie;                          /**< [out] identifier for the core in kernel space on which the job stalled */
+	u32 heap_added_size;
 } _mali_uk_gp_job_suspended_s;
 
 /** @} */ /* end group _mali_uk_gp */

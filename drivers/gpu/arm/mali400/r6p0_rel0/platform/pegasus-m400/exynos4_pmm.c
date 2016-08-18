@@ -240,7 +240,7 @@ static void update_time_in_state(int level);
 static void mali_dvfs_work_handler(struct work_struct *w);
 static struct workqueue_struct *mali_dvfs_wq = 0;
 extern mali_io_address clk_register_map;
-_mali_osk_spinlock_irq_t *mali_dvfs_lock;
+_mali_osk_mutex_t *mali_dvfs_lock;
 int mali_runtime_resumed = -1;
 static DECLARE_WORK(mali_dvfs_work, mali_dvfs_work_handler);
 
@@ -267,18 +267,18 @@ void mali_regulator_enable(void)
 
 void mali_regulator_set_voltage(int min_uV, int max_uV)
 {
-	_mali_osk_spinlock_irq_lock(mali_dvfs_lock);
+	_mali_osk_mutex_wait(mali_dvfs_lock);
 	if(IS_ERR_OR_NULL(g3d_regulator))
 	{
 		MALI_DEBUG_PRINT(1, ("error on mali_regulator_set_voltage : g3d_regulator is null\n"));
-		_mali_osk_spinlock_irq_unlock(mali_dvfs_lock);
+		_mali_osk_mutex_signal(mali_dvfs_lock);
 		return;
 	}
 	MALI_PRINT(("= regulator_set_voltage: %d, %d \n",min_uV, max_uV));
 	regulator_set_voltage(g3d_regulator, min_uV, max_uV);
 	mali_gpu_vol = regulator_get_voltage(g3d_regulator);
 	MALI_DEBUG_PRINT(1, ("Mali voltage: %d\n", mali_gpu_vol));
-	_mali_osk_spinlock_irq_unlock(mali_dvfs_lock);
+	_mali_osk_mutex_signal(mali_dvfs_lock);
 }
 #endif
 
@@ -446,16 +446,19 @@ void mali_clk_set_rate(unsigned int clk, unsigned int mhz)
 	int err;
 	unsigned long rate = (unsigned long)clk * (unsigned long)mhz;
 
-	_mali_osk_spinlock_irq_lock(mali_dvfs_lock);
+	_mali_osk_mutex_wait(mali_dvfs_lock);
 	MALI_DEBUG_PRINT(3, ("Mali platform: Setting frequency to %d mhz\n", clk));
 
 	if (mali_clk_get() == MALI_FALSE) {
-  	_mali_osk_spinlock_irq_unlock(mali_dvfs_lock);
+  	_mali_osk_mutex_signal(mali_dvfs_lock);
  		return;
 	}
-
+	
 	if (bis_vpll)
 	{
+		/* in Pega-prime, vpll_src_clock means ext_xtal_clock!! */
+		clk_set_parent(sclk_vpll_clock, vpll_src_clock);
+
 		clk_set_rate(fout_vpll_clock, (unsigned int)clk * GPU_MHZ);
 		clk_set_parent(vpll_src_clock, ext_xtal_clock);
 		clk_set_parent(sclk_vpll_clock, fout_vpll_clock);
@@ -471,7 +474,7 @@ void mali_clk_set_rate(unsigned int clk, unsigned int mhz)
 
 	if (atomic_read(&clk_active) == 0) {
 		if (clk_enable(mali_clock) < 0) {
-			_mali_osk_spinlock_irq_unlock(mali_dvfs_lock);
+			_mali_osk_mutex_signal(mali_dvfs_lock);
  			return;
 		}
 		atomic_set(&clk_active, 1);
@@ -489,7 +492,7 @@ void mali_clk_set_rate(unsigned int clk, unsigned int mhz)
 
 	mali_clk_put(MALI_FALSE);
 
-	_mali_osk_spinlock_irq_unlock(mali_dvfs_lock);
+	_mali_osk_mutex_signal(mali_dvfs_lock);
 }
 
 int get_mali_dvfs_control_status(void)
@@ -499,12 +502,12 @@ int get_mali_dvfs_control_status(void)
 
 mali_bool set_mali_dvfs_current_step(unsigned int step)
 {
-	_mali_osk_spinlock_irq_lock(mali_dvfs_lock);
+	_mali_osk_mutex_wait(mali_dvfs_lock);
 	maliDvfsStatus.currentStep = step % MALI_DVFS_STEPS;
 	if (step >= MALI_DVFS_STEPS)
 		mali_runtime_resumed = maliDvfsStatus.currentStep;
 
-	_mali_osk_spinlock_irq_unlock(mali_dvfs_lock);
+	_mali_osk_mutex_signal(mali_dvfs_lock);
 	return MALI_TRUE;
 }
 
@@ -872,9 +875,8 @@ static mali_bool init_mali_clock(void)
 	if (mali_clock != 0)
 		return ret; /* already initialized */
 
-	//mali_dvfs_lock = _mali_osk_lock_init(_MALI_OSK_LOCKFLAG_NONINTERRUPTABLE | _MALI_OSK_LOCKFLAG_ONELOCK, 0, 0);
-	//mali_dvfs_lock = _mali_osk_mutex_init(_MALI_OSK_LOCKFLAG_ORDERED, 0);
-	mali_dvfs_lock = _mali_osk_spinlock_irq_init(_MALI_OSK_LOCKFLAG_ORDERED, 0);
+	mali_dvfs_lock = _mali_osk_mutex_init(_MALI_OSK_LOCKFLAG_ORDERED, 0);
+
 	if (mali_dvfs_lock == NULL)
 		return _MALI_OSK_ERR_FAULT;
 

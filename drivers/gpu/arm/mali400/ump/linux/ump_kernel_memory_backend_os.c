@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2010-2011 ARM Limited. All rights reserved.
- * 
+ * Copyright (C) 2011-2012 ARM Limited. All rights reserved.
+ *
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
- * 
+ *
  * A copy of the licence is included with the program, and can also be obtained from Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
@@ -150,8 +150,7 @@ static int os_allocate(void* ctx, ump_dd_mem * descriptor)
 		}
 		if (NULL == new_page)
 		{
-			/* MALI_SEC */
-			DBG_MSG(1, ("UMP memory allocated: Out of Memory !!\n"));
+			MSG_ERR(("UMP memory allocated: Out of Memory !!\n"));
 			break;
 		}
 
@@ -185,9 +184,6 @@ static int os_allocate(void* ctx, ump_dd_mem * descriptor)
 	if (left)
 	{
 		DBG_MSG(1, ("Failed to allocate needed pages\n"));
-		printk(KERN_ALERT"UMP::Failed to allocated pages, totally pages  = %d, allocated pages = %d, currently requested pages = %d \n",
-			(int)info->num_pages_max, (int)info->num_pages_allocated, left + pages_allocated);
-		/* MALI_SEC */
 		DBG_MSG(1, ("UMP memory allocated: %d kB  Configured maximum OS memory usage: %d kB\n",
 				 (pages_allocated * _MALI_OSK_CPU_PAGE_SIZE)/1024, (info->num_pages_max* _MALI_OSK_CPU_PAGE_SIZE)/1024));
 

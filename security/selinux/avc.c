@@ -498,21 +498,6 @@ static noinline int slow_avc_audit(u32 ssid, u32 tsid, u16 tclass,
 	return 0;
 }
 
-static inline int avc_operation_audit(u32 ssid, u32 tsid, u16 tclass,
-				u32 requested, struct av_decision *avd,
-				struct operation_decision *od,
-				u16 cmd, int result,
-				struct common_audit_data *ad)
-{
-	u32 audited, denied;
-	audited = avc_operation_audit_required(
-			requested, avd, od, cmd, result, &denied);
-	if (likely(!audited))
-		return 0;
-	return slow_avc_audit(ssid, tsid, tclass, requested,
-			      audited, denied, result, ad, 0);
-}
-
 /**
  * avc_audit - Audit the granting or denial of permissions.
  * @ssid: source security identifier

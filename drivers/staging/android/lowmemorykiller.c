@@ -109,10 +109,6 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	int other_file = global_page_state(NR_FILE_PAGES) -
 						global_page_state(NR_SHMEM);
 
-#if defined(CONFIG_ZRAM_FOR_ANDROID) || defined(CONFIG_ZSWAP)
-	other_file -= total_swapcache_pages;
-#endif /* CONFIG_ZRAM_FOR_ANDROID */
-
 	/*
 	 * If we already have a death outstanding, then
 	 * bail out right away; indicating to vmscan
@@ -221,15 +217,17 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		lowmem_deathpending_timeout = jiffies + HZ;
 		send_sig(SIGKILL, selected, 0);
 		rem -= selected_tasksize;
-#ifdef LMK_COUNT_READ
-		lmk_count++;
-#endif
 	}
 	lowmem_print(4, "lowmem_shrink %lu, %x, return %d\n",
 		     sc->nr_to_scan, sc->gfp_mask, rem);
 	rcu_read_unlock();
 	return rem;
 }
+
+static struct shrinker lowmem_shrinker = {
+	.shrink = lowmem_shrink,
+	.seeks = DEFAULT_SEEKS * 16
+};
 
 static int __init lowmem_init(void)
 {
@@ -242,20 +240,6 @@ static void __exit lowmem_exit(void)
 {
 	unregister_shrinker(&lowmem_shrinker);
 	task_free_unregister(&task_nb);
-
-#ifdef CONFIG_ZRAM_FOR_ANDROID
-	idle_notifier_unregister(&kcompcache_idle_nb);
-	if (s_reclaim.kcompcached) {
-		cancel_soft_reclaim();
-		kthread_stop(s_reclaim.kcompcached);
-		s_reclaim.kcompcached = NULL;
-	}
-
-	if (kcompcache_class) {
-		class_remove_file(kcompcache_class, &class_attr_rtcc_trigger);
-		class_destroy(kcompcache_class);
-	}
-#endif /* CONFIG_ZRAM_FOR_ANDROID */
 }
 
 #ifdef CONFIG_ANDROID_LOW_MEMORY_KILLER_AUTODETECT_OOM_ADJ_VALUES
@@ -446,23 +430,7 @@ module_param_array_named(minfree, lowmem_minfree, uint, &lowmem_minfree_size,
 			 S_IRUGO | S_IWUSR);
 module_param_named(debug_level, lowmem_debug_level, uint, S_IRUGO | S_IWUSR);
 
-#ifdef LMK_COUNT_READ
-module_param_named(lmkcount, lmk_count, uint, S_IRUGO);
-#endif
-
-#ifdef OOM_COUNT_READ
-module_param_named(oomcount, oom_count, uint, S_IRUGO);
-#endif
-
-#ifdef CONFIG_ZRAM_FOR_ANDROID
-module_param_named(nr_reclaim, number_of_reclaim_pages, uint, S_IRUSR | S_IWUSR);
-module_param_named(min_freeswap, minimum_freeswap_pages, uint, S_IRUSR | S_IWUSR);
-module_param_named(min_reclaim, minimum_reclaim_pages, uint, S_IRUSR | S_IWUSR);
-module_param_named(min_interval, minimum_interval_time, uint, S_IRUSR | S_IWUSR);
-#endif /* CONFIG_ZRAM_FOR_ANDROID */
-
 module_init(lowmem_init);
 module_exit(lowmem_exit);
 
 MODULE_LICENSE("GPL");
-

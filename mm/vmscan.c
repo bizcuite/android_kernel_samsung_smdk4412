@@ -803,11 +803,7 @@ static noinline_for_stack void free_page_list(struct list_head *free_pages)
 /*
  * shrink_page_list() returns the number of reclaimed pages
  */
-<<<<<<< HEAD
-static unsigned long shrink_page_list(struct list_head *page_list,
-=======
-unsigned long shrink_page_list(struct list_head *page_list,
->>>>>>> c472828... Revert "Add ZRAM_FOR_ANDROID"
+
 				      struct zone *zone,
 				      struct scan_control *sc)
 {
@@ -1329,11 +1325,7 @@ static unsigned long isolate_pages_global(unsigned long nr,
  * clear_active_flags() is a helper for shrink_active_list(), clearing
  * any active bits from the pages in the list.
  */
-<<<<<<< HEAD
-static unsigned long clear_active_flags(struct list_head *page_list,
-=======
 unsigned long clear_active_flags(struct list_head *page_list,
->>>>>>> c472828... Revert "Add ZRAM_FOR_ANDROID"
 					unsigned int *count)
 {
 	int nr_active = 0;

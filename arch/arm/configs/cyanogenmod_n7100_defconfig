@@ -3017,7 +3017,6 @@ CONFIG_ANDROID_LMK_ADJ_RBTREE=y
 # CONFIG_VT6656 is not set
 # CONFIG_IIO is not set
 # CONFIG_XVMALLOC is not set
-# CONFIG_ZRAM is not set
 # CONFIG_FB_SM7XX is not set
 # CONFIG_LIRC_STAGING is not set
 # CONFIG_EASYCAP is not set

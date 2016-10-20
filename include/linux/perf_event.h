@@ -218,7 +218,7 @@ struct perf_event_attr {
 				precise_ip     :  2, /* skid constraint       */
 				mmap_data      :  1, /* non-exec mmap data    */
 				sample_id_all  :  1, /* sample_type all events */
-
+				constraint_duplicate : 1,
 				__reserved_1   : 45;
 
 	union {
